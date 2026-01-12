@@ -1,5 +1,0 @@
-Certificate Sending Logs (SendGrid API)
-
-✅ Sent to smdtabraiz786@gmail.com
-✅ Sent to 249xa32131@gprec.ac.in
-✅ Sent to arbazcme@gmail.com

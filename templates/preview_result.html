@@ -17,7 +17,7 @@
 
                     <h3 class="mb-4">📨 Certificate Sending Status</h3>
 
-                    <!-- SUMMARY CARDS -->
+                    <!-- SUMMARY -->
                     <div class="row mb-4">
                         <div class="col-md-4">
                             <div class="card shadow-sm">
@@ -47,19 +47,49 @@
                         </div>
                     </div>
 
-                    {% if failed > 0 %}
+                    {% if failed_details and failed_details|length > 0 %}
                     <div class="alert alert-warning">
-                        ⚠️ Some certificates could not be sent. Please check logs.
+                        ⚠️ Some certificates could not be sent. See details below.
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-striped">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>#</th>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Certificate</th>
+                                    <th>Reason</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in failed_details %}
+                                <tr>
+                                    <td>{{ loop.index }}</td>
+                                    <td>{{ item["name"] }}</td>
+                                    <td>{{ item["email"] }}</td>
+                                    <td>{{ item["certificate"] }}</td>
+                                    <td class="text-danger">{{ item["reason"] }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-success">
+                        ✅ All certificates were sent successfully.
                     </div>
                     {% endif %}
 
                     <div class="d-grid gap-2 mt-4">
-                        <a href="/" class="btn btn-primary">
-                            ➕ Send More Certificates
+                        <a href="/" class="btn btn-primary">➕ Send More</a>
+
+                        {% if failed_details and failed_details|length > 0 %}
+                        <a href="/download-failed" class="btn btn-outline-danger">
+                            ⬇️ Download Failed CSV
                         </a>
-                        <a href="/download-logs" class="btn btn-outline-secondary">
-                            📥 Download Logs
-                        </a>
+                        {% endif %}
                     </div>
 
                 </div>

@@ -1,4 +1,14 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session
+
+from flask import (
+    Flask,
+    render_template,
+    request,
+    redirect,
+    url_for,
+    flash,
+    session,
+    send_file
+)
 import os
 import csv
 
@@ -13,6 +23,7 @@ UPLOAD_CSV = "uploads/csv"
 UPLOAD_CERTS = "uploads/certificates"
 RENAMED_FOLDER = "certificates_renamed"
 LOG_FILE = "logs.txt"
+FAILED_CSV = "failed_certificates.csv"
 
 os.makedirs(UPLOAD_CSV, exist_ok=True)
 os.makedirs(UPLOAD_CERTS, exist_ok=True)
@@ -37,54 +48,44 @@ def preview():
         flash("CSV or certificates missing", "danger")
         return redirect(url_for("index"))
 
-    # Save CSV
     csv_path = os.path.join(UPLOAD_CSV, csv_file.filename)
     csv_file.save(csv_path)
 
-    # Save certificates
     for f in cert_files:
         f.save(os.path.join(UPLOAD_CERTS, f.filename))
 
     preview_data = []
 
-    # ===== SAFE CSV READ (PRODUCTION STYLE) =====
     with open(csv_path, newline="", encoding="utf-8-sig") as f:
         reader = csv.DictReader(f)
 
-        # Normalize headers
         headers = [h.strip().lower() for h in reader.fieldnames]
         reader.fieldnames = headers
 
-        # Auto-detect filename column
-        filename_col = None
-        for h in headers:
-            if h in ("filename", "file", "file_name"):
-                filename_col = h
-                break
+        filename_col = next(
+            (h for h in headers if h in ("filename", "file", "file_name")),
+            None
+        )
 
         for idx, row in enumerate(reader, start=1):
-            name = row["name"]
-            email = row["email"]
+            name = row.get("name", "").strip()
+            email = row.get("email", "").strip()
 
             filename_value = (row.get(filename_col) or "").strip() if filename_col else ""
             cert_name = "Missing"
 
-            # 1️⃣ filename logic
             if filename_value:
-                # numeric mapping
                 if filename_value.isdigit():
                     for ext in [".jpg", ".jpeg", ".png", ".pdf"]:
                         path = os.path.join(UPLOAD_CERTS, f"{filename_value}{ext}")
                         if os.path.exists(path):
                             cert_name = f"{filename_value}{ext}"
                             break
-                # exact filename
                 else:
                     path = os.path.join(UPLOAD_CERTS, filename_value)
                     if os.path.exists(path):
                         cert_name = filename_value
 
-            # 2️⃣ fallback to index
             if cert_name == "Missing":
                 for ext in [".jpg", ".jpeg", ".png", ".pdf"]:
                     path = os.path.join(UPLOAD_CERTS, f"{idx}{ext}")
@@ -105,16 +106,6 @@ def preview():
         csv_filename=csv_file.filename
     )
 
-# ================= RESULT =================
-@app.route("/preview-result")
-def preview_result():
-    return render_template(
-        "preview_result.html",
-        total=session.get("total", 0),
-        sent=session.get("sent", 0),
-        failed=session.get("failed", 0)
-    )
-
 # ================= SEND =================
 @app.route("/process", methods=["POST"])
 def process():
@@ -129,7 +120,7 @@ def process():
 
         rename_certificates(csv_path, UPLOAD_CERTS, RENAMED_FOLDER)
 
-        sent_count, failed_count = send_certificates(
+        sent_count, failed_count, failed_details = send_certificates(
             csv_path,
             RENAMED_FOLDER,
             sender_email,
@@ -139,9 +130,20 @@ def process():
             LOG_FILE
         )
 
+        # ✅ SAFE SESSION DATA (ONLY NUMBERS)
         session["sent"] = sent_count
         session["failed"] = failed_count
         session["total"] = sent_count + failed_count
+
+        # ✅ WRITE FAILED DETAILS TO CSV (NOT SESSION)
+        if failed_details:
+            with open(FAILED_CSV, "w", newline="", encoding="utf-8") as f:
+                writer = csv.DictWriter(
+                    f,
+                    fieldnames=["name", "email", "certificate", "reason"]
+                )
+                writer.writeheader()
+                writer.writerows(failed_details)
 
     except Exception as e:
         flash(f"❌ Error: {str(e)}", "danger")
@@ -149,5 +151,38 @@ def process():
 
     return redirect(url_for("preview_result"))
 
+# ================= RESULT =================
+# ================= RESULT =================
+@app.route("/preview-result")
+def preview_result():
+    failed_rows = []
+
+    if os.path.exists(FAILED_CSV):
+        with open(FAILED_CSV, newline="", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            failed_rows = list(reader)
+
+    return render_template(
+        "preview_result.html",
+        total=session.get("total", 0),
+        sent=session.get("sent", 0),
+        failed=session.get("failed", 0),
+        failed_details=failed_rows   # ✅ THIS WAS MISSING
+    )
+
+# ================= DOWNLOAD FAILED CSV =================
+@app.route("/download-failed")
+def download_failed():
+    if not os.path.exists(FAILED_CSV):
+        flash("No failed records available.", "info")
+        return redirect(url_for("preview_result"))
+
+    return send_file(
+        FAILED_CSV,
+        as_attachment=True,
+        download_name="failed_certificates.csv"
+    )
+
+# ================= RUN =================
 if __name__ == "__main__":
     app.run(debug=True)
