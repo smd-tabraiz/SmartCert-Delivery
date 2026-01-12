@@ -1,30 +1,16 @@
-# Automation Linked Certificates 🎓
+# SmartCert-Delivery
 
-This project automates:
-- Certificate renaming using CSV
-- Preview before sending
-- Bulk email sending using SendGrid API
-- Web UI built with Flask + Bootstrap
-
----
+SmartCert-Delivery is a Flask-based web application to automate certificate
+renaming, previewing, and email delivery using SendGrid API.
 
 ## Features
-- Upload CSV (name, email)
-- Upload certificates (1.png, 2.png, ...)
-- Preview mapping before sending
-- Send certificates securely via SendGrid
-- Download logs
-- Clean UI
-
----
+- Upload CSV & certificates
+- Preview certificate mapping
+- Optional filename-based mapping
+- Send certificates via email
+- Spam-safe API-based delivery
 
 ## Tech Stack
 - Python
 - Flask
 - SendGrid API
-- Bootstrap 5
-
----
-
-## Author
-SMD Tabraiz
